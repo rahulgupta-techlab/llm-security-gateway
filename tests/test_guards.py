@@ -38,3 +38,13 @@ def test_detects_api_key_as_secret():
 def test_redact_replaces_spans():
     text = "mail me at a.b@c.de please"
     assert redact(text, detect_pii(text)) == "mail me at [EMAIL] please"
+
+
+def test_benchmark_has_no_false_positives_and_reasonable_recall():
+    import json
+    from src.benchmark import DATA, evaluate
+    from src.policy import Policy
+    rows = [json.loads(l) for l in DATA.read_text(encoding="utf-8").splitlines() if l.strip()]
+    r = evaluate(rows, Policy())
+    assert r["false_positive_rate"] == 0.0
+    assert r["detection_rate"] >= 0.7
