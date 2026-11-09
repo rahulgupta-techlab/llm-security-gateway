@@ -1,5 +1,9 @@
 """Measure the injection detector on a labelled prompt set.
 
+Compares the rules alone with rules + the ML classifier on data/prompts.jsonl
+(hand-written, never used for training), then prints the classifier's
+held-out metrics from training.
+
     python -m src.benchmark
 """
 from __future__ import annotations
@@ -8,9 +12,12 @@ import json
 import time
 from pathlib import Path
 
+from src.classifier import default_classifier
 from src.policy import Policy, check_prompt
 
-DATA = Path(__file__).resolve().parent.parent / "data" / "prompts.jsonl"
+ROOT = Path(__file__).resolve().parent.parent
+DATA = ROOT / "data" / "prompts.jsonl"
+CLF_METRICS = ROOT / "models" / "injection_clf_metrics.json"
 
 
 def evaluate(rows: list[dict], policy: Policy) -> dict:
@@ -40,14 +47,21 @@ def evaluate(rows: list[dict], policy: Policy) -> dict:
 
 def main() -> None:
     rows = [json.loads(l) for l in DATA.read_text(encoding="utf-8").splitlines() if l.strip()]
-    r = evaluate(rows, Policy())
-    print(f"attacks={r['attacks']} benign={r['benign']}")
-    print(f"detection_rate={r['detection_rate']:.2f} false_positive_rate={r['false_positive_rate']:.2f} "
-          f"precision={r['precision']:.2f} ms/prompt={r['ms_per_prompt']}")
-    for t in r["missed"]:
-        print("  missed:", t)
-    for t in r["false_alarms"]:
-        print("  false alarm:", t)
+    default_classifier()  # load the model before timing, as the gateway does at startup
+    for name, policy in [("rules", Policy(ml_classifier=False)), ("rules+ml", Policy())]:
+        r = evaluate(rows, policy)
+        print(f"[{name}] attacks={r['attacks']} benign={r['benign']}")
+        print(f"detection_rate={r['detection_rate']:.2f} false_positive_rate={r['false_positive_rate']:.2f} "
+              f"precision={r['precision']:.2f} ms/prompt={r['ms_per_prompt']}")
+        for t in r["missed"]:
+            print("  missed:", t)
+        for t in r["false_alarms"]:
+            print("  false alarm:", t)
+
+    m = json.loads(CLF_METRICS.read_text(encoding="utf-8"))
+    t = m["test"]
+    print(f"[classifier, held-out test split] n={t['n']} threshold={m['threshold']} precision={t['precision']} "
+          f"recall={t['recall']} f1={t['f1']} false_positive_rate={t['false_positive_rate']}")
 
 
 if __name__ == "__main__":

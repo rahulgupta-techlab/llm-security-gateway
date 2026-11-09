@@ -6,6 +6,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src ./src
 COPY data ./data
+COPY models ./models
 
 RUN useradd --create-home gateway
 USER gateway

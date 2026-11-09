@@ -17,6 +17,7 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+from src.classifier import default_classifier
 from src.policy import Policy, check_prompt, check_response
 
 
@@ -49,6 +50,8 @@ def http_upstream(base_url: str, api_key: str | None = None, timeout: float = 60
 
 def create_app(upstream: Upstream, policy: Policy | None = None) -> FastAPI:
     policy = policy or Policy()
+    if policy.ml_classifier:
+        default_classifier()  # load the model at startup, not on the first request
     app = FastAPI(title="LLM Security Gateway")
     app.state.audit = []  # in-memory audit log; swap for a real sink in production
 

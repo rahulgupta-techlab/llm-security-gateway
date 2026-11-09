@@ -1,0 +1,70 @@
+{
+  "datasets": {
+    "jailbreak_llms_jailbreak.csv": "https://raw.githubusercontent.com/verazuo/jailbreak_llms/4f4031bf8be187f4478c7f94f42b08714722c12e/data/prompts/jailbreak_prompts_2023_12_25.csv",
+    "jailbreak_llms_regular.csv": "https://raw.githubusercontent.com/verazuo/jailbreak_llms/4f4031bf8be187f4478c7f94f42b08714722c12e/data/prompts/regular_prompts_2023_12_25.csv",
+    "purplellama_prompt_injection.json": "https://raw.githubusercontent.com/meta-llama/PurpleLlama/f64eebd53003a87d9c2d2a3a712133534c214c8d/CybersecurityBenchmarks/datasets/prompt_injection/prompt_injection.json",
+    "xstest_prompts.csv": "https://raw.githubusercontent.com/paul-rottger/xstest/d7bb5bd738c1fcbc36edd83d5e7d1b71a3e2d84d/xstest_prompts.csv"
+  },
+  "split": {
+    "train": 10653,
+    "validation": 1522,
+    "test": 3044,
+    "seed": 0
+  },
+  "threshold": 0.860566,
+  "threshold_rule": "lowest score with validation benign FPR <= 0.01",
+  "test": {
+    "n": 3044,
+    "attacks": 322,
+    "benign": 2722,
+    "precision": 0.794,
+    "recall": 0.478,
+    "f1": 0.597,
+    "false_positive_rate": 0.015,
+    "per_source": {
+      "jailbreak_llms": {
+        "n": 273,
+        "recall": 0.454
+      },
+      "jailbreak_llms_regular": {
+        "n": 2632,
+        "false_positive_rate": 0.015
+      },
+      "purplellama": {
+        "n": 49,
+        "recall": 0.612
+      },
+      "xstest": {
+        "n": 90,
+        "false_positive_rate": 0.0
+      }
+    }
+  },
+  "test_at_0.5": {
+    "n": 3044,
+    "attacks": 322,
+    "benign": 2722,
+    "precision": 0.598,
+    "recall": 0.711,
+    "f1": 0.65,
+    "false_positive_rate": 0.057,
+    "per_source": {
+      "jailbreak_llms": {
+        "n": 273,
+        "recall": 0.696
+      },
+      "jailbreak_llms_regular": {
+        "n": 2632,
+        "false_positive_rate": 0.058
+      },
+      "purplellama": {
+        "n": 49,
+        "recall": 0.796
+      },
+      "xstest": {
+        "n": 90,
+        "false_positive_rate": 0.011
+      }
+    }
+  }
+}

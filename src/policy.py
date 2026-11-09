@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from src.classifier import detect_injection_ml
 from src.guards import Finding, detect_injection, detect_pii, redact
 
 
@@ -12,6 +13,8 @@ class Policy:
     redact_pii_in_prompt: bool = True     # mask PII before it reaches the model
     block_secrets_in_prompt: bool = True  # never forward API keys / private keys
     redact_pii_in_response: bool = True   # mask PII the model leaks back
+    ml_classifier: bool = True            # second stage for prompts the rules let through
+    ml_threshold: float | None = None     # None = threshold stored with the trained model
 
 
 @dataclass
@@ -28,6 +31,10 @@ def check_prompt(text: str, policy: Policy) -> Decision:
     if top >= policy.block_injection_score:
         labels = sorted({f.label for f in injections})
         return Decision("block", text, injections, f"prompt injection: {', '.join(labels)}")
+    if policy.ml_classifier:
+        ml = detect_injection_ml(text, policy.ml_threshold)
+        if ml:
+            return Decision("block", text, injections + ml, f"prompt injection: ml_classifier (p={ml[0].score:.2f})")
 
     pii = detect_pii(text)
     secrets = [f for f in pii if f.kind == "secret"]

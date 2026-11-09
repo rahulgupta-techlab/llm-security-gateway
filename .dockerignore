@@ -1,0 +1,4 @@
+data/external/
+.git
+.venv/
+__pycache__/
