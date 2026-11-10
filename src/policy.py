@@ -15,6 +15,7 @@ class Policy:
     redact_pii_in_response: bool = True   # mask PII the model leaks back
     ml_classifier: bool = True            # second stage for prompts the rules let through
     ml_threshold: float | None = None     # None = threshold stored with the trained model
+    stream_holdback_chars: int = 64       # streamed text held back so PII split across chunks is caught
 
 
 @dataclass
