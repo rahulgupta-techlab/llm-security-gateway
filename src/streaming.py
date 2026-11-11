@@ -8,6 +8,7 @@ only released once it can no longer change, and it is redacted on the way out.
 from __future__ import annotations
 
 import json
+from collections import Counter
 from typing import Any, Iterator
 
 from src.guards import detect_pii, redact
@@ -18,7 +19,7 @@ class StreamRedactor:
         self.holdback, self.enabled = holdback, enabled
         self.pending = ""   # received but not yet released
         self.context = ""   # last released raw character, for \b and lookbehinds
-        self.labels: set[str] = set()
+        self.labels: Counter[str] = Counter()  # redacted values per label
 
     def feed(self, text: str) -> str:
         """Add streamed text; return the part that is now safe to send."""

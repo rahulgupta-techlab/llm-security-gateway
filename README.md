@@ -21,6 +21,7 @@ client ──► /v1/chat/completions ──► [prompt guards] ──► upstre
 **Operations**
 - Drop-in compatible: clients only change the base URL.
 - Audit log of every block and redaction with request IDs and latency (`GET /audit`).
+- Prometheus metrics: requests, blocks, redactions and latency (`GET /metrics`, see below).
 - Docker image, docker-compose with a real vLLM server, and GitHub Actions CI.
 
 ## Quick start
@@ -78,6 +79,37 @@ Checked end to end with the official `openai` Python client against the gateway 
 
 **Limit:** an email local part longer than the holdback window can start streaming before its `@` arrives. Raise `stream_holdback_chars` if that matters more than the delay.
 
+## Metrics
+
+`GET /metrics` serves the Prometheus text format (via `prometheus_client`, one registry per app):
+
+| metric | type | labels |
+| --- | --- | --- |
+| `gateway_requests_total` | counter | `outcome` (`allowed`, `blocked`, `upstream_error`, `rejected`, `client_disconnected`), `stream` |
+| `gateway_blocks_total` | counter | `reason` (`injection_rules`, `injection_ml`, `secret`) |
+| `gateway_redactions_total` | counter | `stage` (`prompt`, `response`), `label` (`email`, `phone`, `iban`, `credit_card`, ...) |
+| `gateway_request_duration_seconds` | histogram | `outcome`, `stream`; request to last byte, upstream included |
+| `gateway_prompt_screening_seconds` | histogram | time spent in the prompt guards alone (rules, ML classifier, PII) |
+
+Labels are small fixed sets: a block is counted by category, never by its free-text reason, and redactions count each masked value under its PII label, never the value itself. Streamed requests are recorded when the stream ends, so their duration covers the whole answer; redactions in a stream are counted per value just like non-streamed ones. A client that disconnects mid-stream is counted as `client_disconnected`. Requests that fail validation (`422`) never reach the guards and are not counted.
+
+```bash
+curl -s localhost:8080/metrics | grep gateway_blocks_total
+# gateway_blocks_total{reason="injection_rules"} 1.0
+```
+
+Scrape config for Prometheus:
+
+```yaml
+scrape_configs:
+  - job_name: llm-security-gateway
+    static_configs: [{ targets: ["gateway:8080"] }]
+```
+
+Useful queries: block rate `sum(rate(gateway_requests_total{outcome="blocked"}[5m])) / sum(rate(gateway_requests_total[5m]))`, guard overhead p95 `histogram_quantile(0.95, rate(gateway_prompt_screening_seconds_bucket[5m]))`.
+
+Tests scrape `/metrics` with the `prometheus_client` parser after allowed, blocked (rules, ML, secret), redacted, failed and streamed requests and check every counter and histogram.
+
 ## ML injection classifier
 
 TF-IDF (word 1-2 grams, 20k features) + logistic regression, trained with scikit-learn and exported to JSON (`models/injection_clf.json`, about 1 MB). The gateway scores it in pure Python, so the runtime image has no ML dependencies; a test checks the scores match scikit-learn. Text is PII-redacted before scoring, so an email address cannot push a benign prompt over the threshold.
@@ -119,7 +151,7 @@ python -m src.train_classifier   # ~15 s on a laptop CPU, rewrites models/
 
 - [x] Second-stage ML injection classifier (TF-IDF + logistic regression on public datasets), precision/recall measured on a held-out split and on the same benchmark
 - [x] Streaming (`stream: true`, SSE) passed through the gateway, with the security checks still applied
-- [ ] Prometheus `/metrics` endpoint: requests, blocks, redactions, latency
+- [x] Prometheus `/metrics` endpoint: requests, blocks, redactions, latency
 - [ ] Guarded RAG endpoint: retrieved context is screened for injected instructions before it reaches the model
 
 ## Project layout
@@ -130,10 +162,11 @@ src/classifier.py        # ML injection classifier, scored in pure Python from J
 src/train_classifier.py  # downloads public datasets, trains, measures, exports the model
 src/policy.py            # block / redact / allow decisions
 src/gateway.py           # FastAPI OpenAI-compatible proxy + audit log
+src/metrics.py           # Prometheus counters and histograms behind GET /metrics
 src/streaming.py         # SSE parsing and PII redaction across streamed chunks
 src/benchmark.py         # rules vs rules + ML on data/prompts.jsonl
 models/                  # trained classifier and its held-out metrics
-tests/                   # 37 tests, upstream faked, no GPU needed
+tests/                   # 45 tests, upstream faked, no GPU needed
 ```
 
 ## License

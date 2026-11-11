@@ -24,6 +24,7 @@ class Decision:
     text: str                       # text to forward (possibly redacted)
     findings: list[Finding] = field(default_factory=list)
     reason: str = ""
+    category: str = ""              # low-cardinality block reason for metrics: injection_rules | injection_ml | secret
 
 
 def check_prompt(text: str, policy: Policy) -> Decision:
@@ -31,16 +32,16 @@ def check_prompt(text: str, policy: Policy) -> Decision:
     top = max((f.score for f in injections), default=0.0)
     if top >= policy.block_injection_score:
         labels = sorted({f.label for f in injections})
-        return Decision("block", text, injections, f"prompt injection: {', '.join(labels)}")
+        return Decision("block", text, injections, f"prompt injection: {', '.join(labels)}", "injection_rules")
     if policy.ml_classifier:
         ml = detect_injection_ml(text, policy.ml_threshold)
         if ml:
-            return Decision("block", text, injections + ml, f"prompt injection: ml_classifier (p={ml[0].score:.2f})")
+            return Decision("block", text, injections + ml, f"prompt injection: ml_classifier (p={ml[0].score:.2f})", "injection_ml")
 
     pii = detect_pii(text)
     secrets = [f for f in pii if f.kind == "secret"]
     if secrets and policy.block_secrets_in_prompt:
-        return Decision("block", text, injections + pii, "secret in prompt: " + ", ".join(sorted({f.label for f in secrets})))
+        return Decision("block", text, injections + pii, "secret in prompt: " + ", ".join(sorted({f.label for f in secrets})), "secret")
     if pii and policy.redact_pii_in_prompt:
         return Decision("redact", redact(text, pii), injections + pii, "pii redacted")
     return Decision("allow", text, injections + pii)
